@@ -106,7 +106,7 @@ if not st.session_state.logged_in:
 
 # Main app logic (after login)
 else:
-    st.title("Envoy")
+    st.title("Chatbot for Insurance")
 
     # Check if Pinecone database is empty
 
