@@ -1,0 +1,14 @@
+google-generativeai
+streamlit
+
+langchain-pinecone==0.1.1 
+langchain-text-splitters==0.2.0 
+langchain==0.2.1 
+langchain-community
+langchain-huggingface
+langchain-google-genai
+pypdf 
+python-dotenv
+python-docx
+pinecone-client[grpc]
+sentence-transformers
