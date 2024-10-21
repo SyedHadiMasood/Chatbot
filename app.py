@@ -1,20 +1,25 @@
 # Import dependencies
 import streamlit as st
 import os
-import pinecone
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Pinecone as PineconeVectorStore
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
-from langchain.document_loaders import PyPDFLoader
-from langchain.schema import Document
-from google.generativeai import chat as ChatGoogleGenerativeAI
+from pinecone import Pinecone
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_pinecone import PineconeVectorStore
 import time
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQA
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_core.documents import Document  
 
 # Set API keys
-gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'  # Your actual Gemini API key
-pinecone_api_key = '7eb34807-5959-49fd-a356-2b23b95b8b41'  # Your actual Pinecone API key
-os.environ['PINECONE_API_KEY'] = pinecone_api_key
+gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'
+api_key = '7eb34807-5959-49fd-a356-2b23b95b8b41'
+os.environ['PINECONE_API_KEY'] = api_key
+
+
+
+
+
 
 # Define constants
 namespace = "wondervector5000"
@@ -24,22 +29,19 @@ chunk_size = 1000
 USERNAME = "User"
 PASSWORD = "Password123"
 
-# Set up Pinecone
-pinecone.init(api_key=pinecone_api_key, environment='us-west1-gcp')  # Ensure correct environment for your project
-
 # Set up embeddings and vector store
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-index = pinecone.Index(index_name)  # Initialize Pinecone index
-docsearch = PineconeVectorStore(
-    index=index,
-    embedding=embeddings,
+docsearch = PineconeVectorStore.from_documents(
+    documents="", 
+    index_name=index_name, 
+    embedding=embeddings, 
     namespace=namespace
 )
 time.sleep(1)
 
 # Set up LLM and QA chain
-llm = ChatGoogleGenerativeAI(
-    api_key=gemni_api_key,
+llm =  ChatGoogleGenerativeAI(
+    google_api_key = gemni_api_key,
     model="gemini-1.5-pro",
     temperature=0,
     max_tokens=None,
@@ -48,8 +50,8 @@ llm = ChatGoogleGenerativeAI(
 )
 
 qa = RetrievalQA.from_chain_type(
-    llm=llm,
-    chain_type="stuff",
+    llm=llm, 
+    chain_type="stuff", 
     retriever=docsearch.as_retriever(search_kwargs={"k": 10})
 )
 
@@ -63,9 +65,11 @@ def add_bg_from_url():
             color: #895051;
         }
         </style>
-        """,
+        """, 
         unsafe_allow_html=True
     )
+
+
 
 # Streamlit app settings
 st.set_page_config(page_title="ASKSIDEWAYS", page_icon=":bar_chart:")
@@ -96,15 +100,17 @@ if not st.session_state.logged_in:
         if username == USERNAME and password == PASSWORD:
             st.session_state.logged_in = True
             st.success("Login successful!")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Invalid username or password")
 
 # Main app logic (after login)
 else:
-    st.title("Chatbot for Insurance")
+    st.title("Insurance Chatbot")
 
-    # Show file upload section
+    # Check if Pinecone database is empty
+
+    # Show file upload section only if the database is empty
     st.write("Upload documents")
     uploaded_file = st.file_uploader("Choose a file", type=["pdf"])
     if uploaded_file:
@@ -118,18 +124,21 @@ else:
                 documents = text_splitter.split_documents(pages)
                 docsearch = PineconeVectorStore.from_documents(
                     documents=documents,
-                    index=index,
+                    index_name=index_name,
                     embedding=embeddings,
                     namespace=namespace,
                 )
             st.success("Document uploaded and processed. You can now ask questions about its content.")
+
 
     # Question input and response
     question = st.text_input("Ask queries related to the uploaded knowledge:")
     if st.button("Submit query"):
         with st.spinner("Getting your answer..."):
             retrieved_docs = docsearch.as_retriever(search_kwargs={"k": 10}).get_relevant_documents(question)
-            context = "\n\n".join([doc.page_content for doc in retrieved_docs])
+            
+            context = "\n\n".join([doc.page_content for doc in retrieved_docs])                                                                                                          
+            # ent for doc in retrieved_docs])
             answer = qa.invoke(question)
             st.session_state.answer = answer["result"]
             st.session_state.question = question
@@ -144,7 +153,7 @@ else:
         # Button to reveal feedback box
         if not st.session_state.show_feedback_box:
             if st.button("Give Feedback"):
-                st.warning("Only submit feedback if necessary. Too much or incorrect feedback may confuse the model!")
+                st.warning("Only submit feedback if it is too much necessary. Giving wrong or too many feedback may make the model confuse!!")
                 st.session_state.show_feedback_box = True
 
         # Feedback section (only show if "Give Feedback" is pressed)
@@ -154,36 +163,39 @@ else:
                 st.session_state.feedback_given = True
                 st.session_state.feedback_submitted = True
 
+
         # Display feedback if submitted
         if st.session_state.feedback_submitted:
             st.write("### Feedback Summary:")
             st.write(f"**Question**: {st.session_state.question}")
             st.write(f"**Answer**: {st.session_state.answer}")
             st.write(f"**Feedback**: {st.session_state.feedback_text}")
-
+            
             # Create the memory reinforcement string
             memory_reinforcement = (
                 f"Question: {st.session_state.question} "
-                f"The answer to the question is: {st.session_state.feedback_text}"
+                f"The answer to the quesiton is: {st.session_state.feedback_text}"
             )
-
+            
             # Convert raw text to Document object
             document_reinf = Document(page_content=memory_reinforcement)
-
+            
             # Store the document in Pinecone
             docsearch = PineconeVectorStore.from_documents(
                 documents=[document_reinf],  # Pass the document inside a list
-                index=index,
+                index_name=index_name,
                 embedding=embeddings,
                 namespace=namespace,
             )
-
+            
             st.success("Model memory updated")
 
     # Clear database button
     if st.button("Clear the database"):
         with st.spinner("Clearing the database..."):
             try:
+                pc = Pinecone(api_key=api_key)
+                index = pc.Index(index_name)
                 index.delete(delete_all=True, namespace=namespace)
                 st.success("Database cleared!")
             except:
