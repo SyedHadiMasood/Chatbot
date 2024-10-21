@@ -23,7 +23,7 @@ os.environ['PINECONE_API_KEY'] = api_key
 
 # Define constants
 namespace = "wondervector5000"
-index_name = "testindex"
+index_name = "ragindex"
 chunk_size = 1000
 
 USERNAME = "User"
