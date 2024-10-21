@@ -12,7 +12,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document  
 
 # Set API keys
-gemni_api_key = 'AIzaSyCsTWCWDBOuebNzNbAXOlw5q5wTuITKsKg'
+gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'
 api_key = '33cd9ba3-0cea-4b41-a097-872091f6fe44'
 os.environ['PINECONE_API_KEY'] = api_key
 
