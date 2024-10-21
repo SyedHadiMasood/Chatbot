@@ -4,20 +4,17 @@ import os
 import pinecone
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Pinecone as PineconeVectorStore
-import time
-from langchain.chat_models import ChatGoogleGenerativeAI
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import PyPDFLoader
 from langchain.schema import Document
+from langchain.chat_models import ChatGoogleGenerativeAI
+import time
 
 # Set API keys
-gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'
-pinecone_api_key = '7eb34807-5959-49fd-a356-2b23b95b8b41'
+gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'  # Your actual Gemini API key
+pinecone_api_key = '7eb34807-5959-49fd-a356-2b23b95b8b41'  # Your actual Pinecone API key
 os.environ['PINECONE_API_KEY'] = pinecone_api_key
-
-# Initialize Pinecone
-pinecone.init(api_key=pinecone_api_key, environment="us-west1-gcp")  # Specify your Pinecone environment
 
 # Define constants
 namespace = "wondervector5000"
@@ -27,17 +24,34 @@ chunk_size = 1000
 USERNAME = "User"
 PASSWORD = "Password123"
 
+# Set up Pinecone
+pinecone.init(api_key=pinecone_api_key, environment='us-west1-gcp')  # Ensure correct environment for your project
+
 # Set up embeddings and vector store
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+index = pinecone.Index(index_name)  # Initialize Pinecone index
+docsearch = PineconeVectorStore(
+    index=index,
+    embedding=embeddings,
+    namespace=namespace
+)
+time.sleep(1)
 
-# Initialize Pinecone index
-index = pinecone.Index(index_name)
+# Set up LLM and QA chain
+llm = ChatGoogleGenerativeAI(
+    api_key=gemni_api_key,
+    model="gemini-1.5-pro",
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2
+)
 
-# Placeholder for documents (will be replaced after file upload)
-documents = []
-
-# Streamlit app settings
-st.set_page_config(page_title="ASKSIDEWAYS", page_icon=":bar_chart:")
+qa = RetrievalQA.from_chain_type(
+    llm=llm,
+    chain_type="stuff",
+    retriever=docsearch.as_retriever(search_kwargs={"k": 10})
+)
 
 # Function to add background color
 def add_bg_from_url():
@@ -49,10 +63,12 @@ def add_bg_from_url():
             color: #895051;
         }
         </style>
-        """, 
+        """,
         unsafe_allow_html=True
     )
 
+# Streamlit app settings
+st.set_page_config(page_title="ASKSIDEWAYS", page_icon=":bar_chart:")
 add_bg_from_url()
 
 # Session state for login, feedback, question, and visibility
@@ -80,7 +96,7 @@ if not st.session_state.logged_in:
         if username == USERNAME and password == PASSWORD:
             st.session_state.logged_in = True
             st.success("Login successful!")
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("Invalid username or password")
 
@@ -100,47 +116,26 @@ else:
                 pages = loader.load_and_split()
                 text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=200)
                 documents = text_splitter.split_documents(pages)
-                
-                # Store documents in Pinecone vector store
                 docsearch = PineconeVectorStore.from_documents(
                     documents=documents,
-                    index_name=index_name,
+                    index=index,
                     embedding=embeddings,
                     namespace=namespace,
                 )
             st.success("Document uploaded and processed. You can now ask questions about its content.")
 
-    # Set up LLM and QA chain
-    llm = ChatGoogleGenerativeAI(
-        google_api_key=gemni_api_key,
-        model="gemini-1.5-pro",
-        temperature=0,
-        max_tokens=None,
-        timeout=None,
-        max_retries=2
-    )
-
-    qa = RetrievalQA.from_chain_type(
-        llm=llm, 
-        chain_type="stuff", 
-        retriever=docsearch.as_retriever(search_kwargs={"k": 10})
-    )
-
     # Question input and response
     question = st.text_input("Ask queries related to the uploaded knowledge:")
     if st.button("Submit query"):
         with st.spinner("Getting your answer..."):
-            if documents:  # Ensure documents have been uploaded
-                retrieved_docs = docsearch.as_retriever(search_kwargs={"k": 10}).get_relevant_documents(question)
-                context = "\n\n".join([doc.page_content for doc in retrieved_docs])
-                answer = qa({"query": question})
-                st.session_state.answer = answer["result"]
-                st.session_state.question = question
-                st.session_state.feedback_given = False
-                st.session_state.feedback_submitted = False
-                st.session_state.show_feedback_box = False  # Reset feedback box visibility
-            else:
-                st.error("No documents found. Please upload a document first.")
+            retrieved_docs = docsearch.as_retriever(search_kwargs={"k": 10}).get_relevant_documents(question)
+            context = "\n\n".join([doc.page_content for doc in retrieved_docs])
+            answer = qa.invoke(question)
+            st.session_state.answer = answer["result"]
+            st.session_state.question = question
+            st.session_state.feedback_given = False
+            st.session_state.feedback_submitted = False
+            st.session_state.show_feedback_box = False  # Reset feedback box visibility
 
     # Display answer if question was submitted
     if st.session_state.question:
@@ -149,12 +144,12 @@ else:
         # Button to reveal feedback box
         if not st.session_state.show_feedback_box:
             if st.button("Give Feedback"):
-                st.warning("Only submit feedback if it is necessary. Giving wrong or excessive feedback may confuse the model!")
+                st.warning("Only submit feedback if necessary. Too much or incorrect feedback may confuse the model!")
                 st.session_state.show_feedback_box = True
 
         # Feedback section (only show if "Give Feedback" is pressed)
         if st.session_state.show_feedback_box and not st.session_state.feedback_given:
-            st.session_state.feedback_text = st.text_input("Briefly explain the problem with the response")
+            st.session_state.feedback_text = st.text_input("Write briefly about the problem with the response")
             if st.button("Submit Feedback"):
                 st.session_state.feedback_given = True
                 st.session_state.feedback_submitted = True
@@ -168,8 +163,8 @@ else:
 
             # Create the memory reinforcement string
             memory_reinforcement = (
-                f"Question: {st.session_state.question}. "
-                f"The answer to the question is: {st.session_state.feedback_text}."
+                f"Question: {st.session_state.question} "
+                f"The answer to the question is: {st.session_state.feedback_text}"
             )
 
             # Convert raw text to Document object
@@ -178,7 +173,7 @@ else:
             # Store the document in Pinecone
             docsearch = PineconeVectorStore.from_documents(
                 documents=[document_reinf],  # Pass the document inside a list
-                index_name=index_name,
+                index=index,
                 embedding=embeddings,
                 namespace=namespace,
             )
@@ -191,5 +186,5 @@ else:
             try:
                 index.delete(delete_all=True, namespace=namespace)
                 st.success("Database cleared!")
-            except Exception as e:
-                st.error(f"Error clearing database: {e}")
+            except:
+                st.error("The database is already empty.")
