@@ -8,7 +8,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.document_loaders import PyPDFLoader
 from langchain.schema import Document
-from langchain.chat_models import ChatGoogleGenerativeAI
+from google.generativeai import chat as ChatGoogleGenerativeAI
 import time
 
 # Set API keys
