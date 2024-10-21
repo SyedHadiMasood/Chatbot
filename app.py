@@ -12,8 +12,8 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.documents import Document  
 
 # Set API keys
-gemni_api_key = 'AIzaSyBn2GUbxcxltMA7fH8QeTfpk22Du0CtpNg'
-api_key = '7eb34807-5959-49fd-a356-2b23b95b8b41'
+gemni_api_key = 'AIzaSyCsTWCWDBOuebNzNbAXOlw5q5wTuITKsKg'
+api_key = '33cd9ba3-0cea-4b41-a097-872091f6fe44'
 os.environ['PINECONE_API_KEY'] = api_key
 
 
@@ -23,7 +23,7 @@ os.environ['PINECONE_API_KEY'] = api_key
 
 # Define constants
 namespace = "wondervector5000"
-index_name = "ragindex"
+index_name = "testindex"
 chunk_size = 1000
 
 USERNAME = "User"
